@@ -27,6 +27,14 @@ pub async fn add_bookmark(
 }
 
 #[tauri::command]
+pub async fn purge_old_deleted(
+  state: State<'_, AppState>,
+  before_iso: String,
+) -> Result<u64, AppError> {
+  svc(&state).purge_old(&before_iso).await
+}
+
+#[tauri::command]
 pub async fn restore_bookmark(
   state: State<'_, AppState>,
   id: String,

@@ -17,4 +17,5 @@ pub trait BookmarkRepository: Send + Sync {
   async fn update(&self, bookmark: &Bookmark) -> Result<(), AppError>;
   async fn soft_delete(&self, id: &str, deleted_at: &str) -> Result<(), AppError>;
   async fn restore(&self, id: &str) -> Result<(), AppError>;
+  async fn purge_old(&self, before_iso: &str) -> Result<u64, AppError>;
 }

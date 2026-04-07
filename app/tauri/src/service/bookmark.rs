@@ -31,6 +31,10 @@ impl<R: BookmarkRepository> BookmarkService<R> {
     Self { repo }
   }
 
+  pub async fn purge_old(&self, before_iso: &str) -> Result<u64, AppError> {
+    self.repo.purge_old(before_iso).await
+  }
+
   pub async fn restore(&self, id: &str) -> Result<Bookmark, AppError> {
     self.repo.restore(id).await?;
     self.repo.get_by_id(id).await?.ok_or(AppError::NotFound)
@@ -141,6 +145,13 @@ mod tests {
       Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
     }
 
+    async fn purge_old(&self, before_iso: &str) -> Result<u64, AppError> {
+      let mut store = self.store.lock().unwrap();
+      let before = store.len();
+      store.retain(|b| b.deleted_at.as_deref().is_none_or(|d| d >= before_iso));
+      Ok((before - store.len()) as u64)
+    }
+
     async fn restore(&self, id: &str) -> Result<(), AppError> {
       let mut store = self.store.lock().unwrap();
       if let Some(b) = store.iter_mut().find(|b| b.id == id) {
@@ -194,6 +205,15 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn purge_old_removes_old_deleted() {
+    let svc = svc();
+    let b = svc.create(create_params("https://example.com")).await.unwrap();
+    svc.soft_delete(&b.id).await.unwrap();
+    let purged = svc.purge_old("9999-01-01T00:00:00.000Z").await.unwrap();
+    assert_eq!(purged, 1);
   }
 
   #[tokio::test]

@@ -101,6 +101,15 @@ impl BookmarkRepository for SqliteBookmarkRepository {
     rows.into_iter().map(Bookmark::try_from).collect()
   }
 
+  async fn purge_old(&self, before_iso: &str) -> Result<u64, AppError> {
+    let result =
+      sqlx::query("DELETE FROM bookmarks WHERE deleted_at IS NOT NULL AND deleted_at < ?")
+        .bind(before_iso)
+        .execute(&self.pool)
+        .await?;
+    Ok(result.rows_affected())
+  }
+
   async fn restore(&self, id: &str) -> Result<(), AppError> {
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%3fZ").to_string();
     sqlx::query("UPDATE bookmarks SET deleted_at = NULL, updated_at = ? WHERE id = ?")
@@ -215,6 +224,22 @@ mod tests {
       created_at: "2026-01-01T00:00:00.000Z".to_string(),
       updated_at: "2026-01-01T00:00:00.000Z".to_string(),
     }
+  }
+
+  #[tokio::test]
+  async fn purge_old_removes_only_old_deleted() {
+    let repo = setup().await;
+    let mut b2 = sample_bookmark("id-2");
+    b2.url = "https://b.com/".to_string();
+    b2.url_normalized = "https://b.com/".to_string();
+    repo.create(&sample_bookmark("id-1")).await.unwrap();
+    repo.create(&b2).await.unwrap();
+    repo.soft_delete("id-1", "2026-01-01T00:00:00.000Z").await.unwrap();
+    repo.soft_delete("id-2", "2026-03-01T00:00:00.000Z").await.unwrap();
+    assert_eq!(repo.purge_old("2026-02-01T00:00:00.000Z").await.unwrap(), 1);
+    assert!(repo.get_by_id("id-1").await.unwrap().is_none());
+    let all = repo.list(&BookmarkFilter { include_deleted: true, ..Default::default() }).await.unwrap();
+    assert_eq!(all.len(), 1);
   }
 
   #[tokio::test]
