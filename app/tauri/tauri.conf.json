@@ -1,0 +1,27 @@
+{
+  "productName": "SiteStone",
+  "version": "0.1.0",
+  "identifier": "com.sitestone.app",
+  "build": {
+    "beforeDevCommand": "cd ../ui && pnpm dev",
+    "beforeBuildCommand": "cd ../ui && pnpm build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../ui/build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "SiteStone",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "url": "index.html",
+        "label": "main"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
