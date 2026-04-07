@@ -31,6 +31,11 @@ impl<R: BookmarkRepository> BookmarkService<R> {
     Self { repo }
   }
 
+  pub async fn soft_delete(&self, id: &str) -> Result<(), AppError> {
+    self.get(id).await?; // ensure exists
+    self.repo.soft_delete(id, &now()).await
+  }
+
   pub async fn update(&self, id: &str, params: UpdateBookmarkParams) -> Result<Bookmark, AppError> {
     let mut bookmark = self.get(id).await?;
     if let Some(title) = params.title { bookmark.title = title; }
@@ -131,6 +136,14 @@ mod tests {
       Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
     }
 
+    async fn soft_delete(&self, id: &str, deleted_at: &str) -> Result<(), AppError> {
+      let mut store = self.store.lock().unwrap();
+      if let Some(b) = store.iter_mut().find(|b| b.id == id) {
+        b.deleted_at = Some(deleted_at.to_string());
+      }
+      Ok(())
+    }
+
     async fn update(&self, updated: &Bookmark) -> Result<(), AppError> {
       let mut store = self.store.lock().unwrap();
       if let Some(b) = store.iter_mut().find(|b| b.id == updated.id) {
@@ -168,6 +181,14 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn soft_delete_hides_from_default_list() {
+    let svc = svc();
+    let b = svc.create(create_params("https://example.com")).await.unwrap();
+    svc.soft_delete(&b.id).await.unwrap();
+    assert!(svc.list(BookmarkFilter::default()).await.unwrap().is_empty());
   }
 
   #[tokio::test]
