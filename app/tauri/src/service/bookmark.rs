@@ -31,6 +31,11 @@ impl<R: BookmarkRepository> BookmarkService<R> {
     Self { repo }
   }
 
+  pub async fn restore(&self, id: &str) -> Result<Bookmark, AppError> {
+    self.repo.restore(id).await?;
+    self.repo.get_by_id(id).await?.ok_or(AppError::NotFound)
+  }
+
   pub async fn soft_delete(&self, id: &str) -> Result<(), AppError> {
     self.get(id).await?; // ensure exists
     self.repo.soft_delete(id, &now()).await
@@ -136,6 +141,14 @@ mod tests {
       Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
     }
 
+    async fn restore(&self, id: &str) -> Result<(), AppError> {
+      let mut store = self.store.lock().unwrap();
+      if let Some(b) = store.iter_mut().find(|b| b.id == id) {
+        b.deleted_at = None;
+      }
+      Ok(())
+    }
+
     async fn soft_delete(&self, id: &str, deleted_at: &str) -> Result<(), AppError> {
       let mut store = self.store.lock().unwrap();
       if let Some(b) = store.iter_mut().find(|b| b.id == id) {
@@ -181,6 +194,15 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn restore_makes_bookmark_visible_again() {
+    let svc = svc();
+    let b = svc.create(create_params("https://example.com")).await.unwrap();
+    svc.soft_delete(&b.id).await.unwrap();
+    svc.restore(&b.id).await.unwrap();
+    assert_eq!(svc.list(BookmarkFilter::default()).await.unwrap().len(), 1);
   }
 
   #[tokio::test]

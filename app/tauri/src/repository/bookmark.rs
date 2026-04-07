@@ -16,4 +16,5 @@ pub trait BookmarkRepository: Send + Sync {
   async fn list(&self, filter: &BookmarkFilter) -> Result<Vec<Bookmark>, AppError>;
   async fn update(&self, bookmark: &Bookmark) -> Result<(), AppError>;
   async fn soft_delete(&self, id: &str, deleted_at: &str) -> Result<(), AppError>;
+  async fn restore(&self, id: &str) -> Result<(), AppError>;
 }

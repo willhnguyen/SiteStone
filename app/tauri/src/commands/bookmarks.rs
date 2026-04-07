@@ -27,6 +27,14 @@ pub async fn add_bookmark(
 }
 
 #[tauri::command]
+pub async fn restore_bookmark(
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<BookmarkDto, AppError> {
+  svc(&state).restore(&id).await.map(BookmarkDto::from)
+}
+
+#[tauri::command]
 pub async fn delete_bookmark(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
   svc(&state).soft_delete(&id).await
 }

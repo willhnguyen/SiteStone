@@ -101,6 +101,16 @@ impl BookmarkRepository for SqliteBookmarkRepository {
     rows.into_iter().map(Bookmark::try_from).collect()
   }
 
+  async fn restore(&self, id: &str) -> Result<(), AppError> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%3fZ").to_string();
+    sqlx::query("UPDATE bookmarks SET deleted_at = NULL, updated_at = ? WHERE id = ?")
+      .bind(&now)
+      .bind(id)
+      .execute(&self.pool)
+      .await?;
+    Ok(())
+  }
+
   async fn soft_delete(&self, id: &str, deleted_at: &str) -> Result<(), AppError> {
     sqlx::query("UPDATE bookmarks SET deleted_at = ?, updated_at = ? WHERE id = ?")
       .bind(deleted_at)
@@ -205,6 +215,16 @@ mod tests {
       created_at: "2026-01-01T00:00:00.000Z".to_string(),
       updated_at: "2026-01-01T00:00:00.000Z".to_string(),
     }
+  }
+
+  #[tokio::test]
+  async fn restore_clears_deleted_at() {
+    let repo = setup().await;
+    repo.create(&sample_bookmark("id-1")).await.unwrap();
+    repo.soft_delete("id-1", "2026-01-02T00:00:00.000Z").await.unwrap();
+    repo.restore("id-1").await.unwrap();
+    let found = repo.get_by_id("id-1").await.unwrap().unwrap();
+    assert!(found.deleted_at.is_none());
   }
 
   #[tokio::test]
