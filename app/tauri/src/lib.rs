@@ -1,5 +1,6 @@
 mod domain;
 mod error;
+mod repository;
 mod sqlite;
 
 use sqlx::sqlite::SqlitePool;
