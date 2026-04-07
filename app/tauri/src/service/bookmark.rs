@@ -4,6 +4,15 @@ use crate::repository::bookmark::{BookmarkFilter, BookmarkRepository};
 use url::Url;
 use uuid::Uuid;
 
+pub struct UpdateBookmarkParams {
+  pub title: Option<String>,
+  pub description: Option<String>,
+  pub tags: Option<Vec<String>>,
+  pub notes: Option<String>,
+  pub status: Option<BookmarkStatus>,
+  pub category: Option<BookmarkCategory>,
+}
+
 pub struct CreateBookmarkParams {
   pub url: String,
   pub title: String,
@@ -20,6 +29,19 @@ pub struct BookmarkService<R> {
 impl<R: BookmarkRepository> BookmarkService<R> {
   pub fn new(repo: R) -> Self {
     Self { repo }
+  }
+
+  pub async fn update(&self, id: &str, params: UpdateBookmarkParams) -> Result<Bookmark, AppError> {
+    let mut bookmark = self.get(id).await?;
+    if let Some(title) = params.title { bookmark.title = title; }
+    if let Some(description) = params.description { bookmark.description = description; }
+    if let Some(tags) = params.tags { bookmark.tags = tags; }
+    if let Some(notes) = params.notes { bookmark.notes = notes; }
+    if let Some(status) = params.status { bookmark.status = status; }
+    if let Some(category) = params.category { bookmark.category = category; }
+    bookmark.updated_at = now();
+    self.repo.update(&bookmark).await?;
+    Ok(bookmark)
   }
 
   pub async fn list(&self, filter: BookmarkFilter) -> Result<Vec<Bookmark>, AppError> {
@@ -109,6 +131,14 @@ mod tests {
       Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
     }
 
+    async fn update(&self, updated: &Bookmark) -> Result<(), AppError> {
+      let mut store = self.store.lock().unwrap();
+      if let Some(b) = store.iter_mut().find(|b| b.id == updated.id) {
+        *b = updated.clone();
+      }
+      Ok(())
+    }
+
     async fn list(&self, filter: &BookmarkFilter) -> Result<Vec<Bookmark>, AppError> {
       Ok(
         self
@@ -138,6 +168,28 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn update_changes_fields() {
+    let svc = svc();
+    let b = svc.create(create_params("https://example.com")).await.unwrap();
+    let updated = svc
+      .update(
+        &b.id,
+        UpdateBookmarkParams {
+          title: Some("New Title".to_string()),
+          status: Some(BookmarkStatus::Read),
+          description: None,
+          tags: None,
+          notes: None,
+          category: None,
+        },
+      )
+      .await
+      .unwrap();
+    assert_eq!(updated.title, "New Title");
+    assert_eq!(updated.status, BookmarkStatus::Read);
   }
 
   #[tokio::test]

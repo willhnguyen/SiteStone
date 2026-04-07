@@ -42,6 +42,18 @@ impl From<Bookmark> for BookmarkDto {
   }
 }
 
+/// Request payload to update an existing bookmark.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBookmarkRequest {
+  pub title: Option<String>,
+  pub description: Option<String>,
+  pub tags: Option<Vec<String>>,
+  pub notes: Option<String>,
+  pub status: Option<BookmarkStatus>,
+  pub category: Option<BookmarkCategory>,
+}
+
 /// Query parameters for listing bookmarks.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

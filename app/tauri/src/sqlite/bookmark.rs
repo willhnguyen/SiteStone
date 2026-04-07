@@ -101,6 +101,33 @@ impl BookmarkRepository for SqliteBookmarkRepository {
     rows.into_iter().map(Bookmark::try_from).collect()
   }
 
+  async fn update(&self, b: &Bookmark) -> Result<(), AppError> {
+    let tags = serde_json::to_string(&b.tags)?;
+    sqlx::query(
+      "UPDATE bookmarks
+       SET url = ?, url_normalized = ?, title = ?, description = ?, tags = ?,
+           notes = ?, status = ?, category = ?, character_count = ?,
+           browser_bookmark_id = ?, deleted_at = ?, updated_at = ?
+       WHERE id = ?",
+    )
+    .bind(&b.url)
+    .bind(&b.url_normalized)
+    .bind(&b.title)
+    .bind(&b.description)
+    .bind(&tags)
+    .bind(&b.notes)
+    .bind(b.status.as_str())
+    .bind(b.category.as_str())
+    .bind(b.character_count)
+    .bind(&b.browser_bookmark_id)
+    .bind(&b.deleted_at)
+    .bind(&b.updated_at)
+    .bind(&b.id)
+    .execute(&self.pool)
+    .await?;
+    Ok(())
+  }
+
   async fn create(&self, b: &Bookmark) -> Result<(), AppError> {
     let tags = serde_json::to_string(&b.tags)?;
     let result = sqlx::query(
@@ -168,6 +195,27 @@ mod tests {
       created_at: "2026-01-01T00:00:00.000Z".to_string(),
       updated_at: "2026-01-01T00:00:00.000Z".to_string(),
     }
+  }
+
+  #[tokio::test]
+  async fn update_persists_changes() {
+    let repo = setup().await;
+    let mut b = sample_bookmark("id-1");
+    repo.create(&b).await.unwrap();
+    b.title = "Updated".to_string();
+    b.status = BookmarkStatus::Read;
+    repo.update(&b).await.unwrap();
+    let row: BookmarkRow = sqlx::query_as(
+      "SELECT id, url, url_normalized, title, description, tags, notes,
+              status, category, character_count, browser_bookmark_id,
+              deleted_at, created_at, updated_at FROM bookmarks WHERE id = ?",
+    )
+    .bind("id-1")
+    .fetch_one(&repo.pool)
+    .await
+    .unwrap();
+    assert_eq!(row.title, "Updated");
+    assert_eq!(row.status, "read");
   }
 
   #[tokio::test]

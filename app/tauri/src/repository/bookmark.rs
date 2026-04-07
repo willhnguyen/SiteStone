@@ -14,4 +14,5 @@ pub trait BookmarkRepository: Send + Sync {
   async fn create(&self, bookmark: &Bookmark) -> Result<(), AppError>;
   async fn get_by_id(&self, id: &str) -> Result<Option<Bookmark>, AppError>;
   async fn list(&self, filter: &BookmarkFilter) -> Result<Vec<Bookmark>, AppError>;
+  async fn update(&self, bookmark: &Bookmark) -> Result<(), AppError>;
 }
