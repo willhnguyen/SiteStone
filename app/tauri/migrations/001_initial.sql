@@ -86,8 +86,4 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   total_reading_sec INTEGER NOT NULL DEFAULT 0
 );
 
--- bookmark_embeddings virtual table (scaffolded, not used yet)
-CREATE VIRTUAL TABLE IF NOT EXISTS bookmark_embeddings USING vec0(
-  bookmark_id TEXT PRIMARY KEY,
-  embedding FLOAT[384]
-);
+-- bookmark_embeddings virtual table created in code after vec0 extension is loaded (see sqlite/db.rs)

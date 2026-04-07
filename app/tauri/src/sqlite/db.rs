@@ -12,17 +12,29 @@ pub async fn init(db_url: &str) -> Result<SqlitePool, AppError> {
     .connect_with(connect_options)
     .await?;
 
-  // Load vec0 extension (scaffolded, not used yet)
-  sqlx::query("SELECT load_extension('vec0')")
-    .execute(&pool)
-    .await
-    .ok(); // ignore if not available
-
   // Run migrations
   sqlx::migrate!("./migrations")
     .run(&pool)
     .await
     .map_err(|e| AppError::Database(sqlx::Error::Io(std::io::Error::other(e.to_string()))))?;
+
+  // Load vec0 extension and scaffold bookmark_embeddings virtual table.
+  // Both steps are silently skipped if the extension is unavailable (test environments).
+  if sqlx::query("SELECT load_extension('vec0')")
+    .execute(&pool)
+    .await
+    .is_ok()
+  {
+    sqlx::query(
+      "CREATE VIRTUAL TABLE IF NOT EXISTS bookmark_embeddings USING vec0(
+        bookmark_id TEXT PRIMARY KEY,
+        embedding FLOAT[384]
+      )",
+    )
+    .execute(&pool)
+    .await
+    .ok();
+  }
 
   Ok(pool)
 }

@@ -18,6 +18,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 dirs = "5.0"
+url = "2.5"
 
 [build-dependencies]
 tauri-build = "2.5"
