@@ -42,6 +42,17 @@ impl From<Bookmark> for BookmarkDto {
   }
 }
 
+/// Query parameters for listing bookmarks.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListBookmarksRequest {
+  pub status: Option<BookmarkStatus>,
+  pub category: Option<BookmarkCategory>,
+  pub include_deleted: Option<bool>,
+  pub limit: Option<i64>,
+  pub offset: Option<i64>,
+}
+
 /// Request payload to create a new bookmark.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

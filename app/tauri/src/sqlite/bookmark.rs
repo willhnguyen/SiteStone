@@ -1,7 +1,8 @@
 use crate::domain::bookmark::{Bookmark, BookmarkCategory, BookmarkStatus};
 use crate::error::AppError;
-use crate::repository::bookmark::BookmarkRepository;
+use crate::repository::bookmark::{BookmarkFilter, BookmarkRepository};
 use sqlx::sqlite::SqlitePool;
+use sqlx::QueryBuilder;
 use std::str::FromStr;
 
 #[derive(sqlx::FromRow)]
@@ -73,6 +74,33 @@ impl BookmarkRepository for SqliteBookmarkRepository {
     row.map(Bookmark::try_from).transpose()
   }
 
+  async fn list(&self, filter: &BookmarkFilter) -> Result<Vec<Bookmark>, AppError> {
+    let mut qb = QueryBuilder::new(
+      "SELECT id, url, url_normalized, title, description, tags, notes,
+              status, category, character_count, browser_bookmark_id,
+              deleted_at, created_at, updated_at
+       FROM bookmarks WHERE 1=1",
+    );
+    if !filter.include_deleted {
+      qb.push(" AND deleted_at IS NULL");
+    }
+    if let Some(status) = &filter.status {
+      qb.push(" AND status = ").push_bind(status.as_str());
+    }
+    if let Some(category) = &filter.category {
+      qb.push(" AND category = ").push_bind(category.as_str());
+    }
+    qb.push(" ORDER BY created_at ASC");
+    if let Some(limit) = filter.limit {
+      qb.push(" LIMIT ").push_bind(limit);
+    }
+    if let Some(offset) = filter.offset {
+      qb.push(" OFFSET ").push_bind(offset);
+    }
+    let rows = qb.build_query_as::<BookmarkRow>().fetch_all(&self.pool).await?;
+    rows.into_iter().map(Bookmark::try_from).collect()
+  }
+
   async fn create(&self, b: &Bookmark) -> Result<(), AppError> {
     let tags = serde_json::to_string(&b.tags)?;
     let result = sqlx::query(
@@ -140,6 +168,36 @@ mod tests {
       created_at: "2026-01-01T00:00:00.000Z".to_string(),
       updated_at: "2026-01-01T00:00:00.000Z".to_string(),
     }
+  }
+
+  #[tokio::test]
+  async fn list_filters_by_status() {
+    let repo = setup().await;
+    repo.create(&sample_bookmark("id-1")).await.unwrap();
+    let mut b2 = sample_bookmark("id-2");
+    b2.url = "https://b.com/".to_string();
+    b2.url_normalized = "https://b.com/".to_string();
+    b2.status = BookmarkStatus::Read;
+    repo.create(&b2).await.unwrap();
+
+    let filter = BookmarkFilter { status: Some(BookmarkStatus::Unread), ..Default::default() };
+    let results = repo.list(&filter).await.unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].id, "id-1");
+  }
+
+  #[tokio::test]
+  async fn list_excludes_deleted_by_default() {
+    let repo = setup().await;
+    repo.create(&sample_bookmark("id-1")).await.unwrap();
+    sqlx::query("UPDATE bookmarks SET deleted_at = '2026-01-02T00:00:00.000Z' WHERE id = ?")
+      .bind("id-1")
+      .execute(&repo.pool)
+      .await
+      .unwrap();
+    assert!(repo.list(&BookmarkFilter::default()).await.unwrap().is_empty());
+    let all = repo.list(&BookmarkFilter { include_deleted: true, ..Default::default() }).await.unwrap();
+    assert_eq!(all.len(), 1);
   }
 
   #[tokio::test]

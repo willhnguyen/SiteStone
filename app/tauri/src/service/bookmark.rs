@@ -1,6 +1,6 @@
 use crate::domain::bookmark::{Bookmark, BookmarkCategory, BookmarkStatus};
 use crate::error::AppError;
-use crate::repository::bookmark::BookmarkRepository;
+use crate::repository::bookmark::{BookmarkFilter, BookmarkRepository};
 use url::Url;
 use uuid::Uuid;
 
@@ -20,6 +20,10 @@ pub struct BookmarkService<R> {
 impl<R: BookmarkRepository> BookmarkService<R> {
   pub fn new(repo: R) -> Self {
     Self { repo }
+  }
+
+  pub async fn list(&self, filter: BookmarkFilter) -> Result<Vec<Bookmark>, AppError> {
+    self.repo.list(&filter).await
   }
 
   pub async fn get(&self, id: &str) -> Result<Bookmark, AppError> {
@@ -104,6 +108,21 @@ mod tests {
     async fn get_by_id(&self, id: &str) -> Result<Option<Bookmark>, AppError> {
       Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
     }
+
+    async fn list(&self, filter: &BookmarkFilter) -> Result<Vec<Bookmark>, AppError> {
+      Ok(
+        self
+          .store
+          .lock()
+          .unwrap()
+          .iter()
+          .filter(|b| filter.include_deleted || b.deleted_at.is_none())
+          .filter(|b| filter.status.as_ref().is_none_or(|s| &b.status == s))
+          .filter(|b| filter.category.as_ref().is_none_or(|c| &b.category == c))
+          .cloned()
+          .collect(),
+      )
+    }
   }
 
   fn svc() -> BookmarkService<FakeBookmarkRepo> {
@@ -119,6 +138,15 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn list_returns_undeleted_bookmarks() {
+    let svc = svc();
+    svc.create(create_params("https://a.com")).await.unwrap();
+    svc.create(create_params("https://b.com")).await.unwrap();
+    let results = svc.list(BookmarkFilter::default()).await.unwrap();
+    assert_eq!(results.len(), 2);
   }
 
   #[tokio::test]

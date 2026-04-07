@@ -1,4 +1,5 @@
-use crate::dto::bookmark::{BookmarkDto, CreateBookmarkRequest};
+use crate::dto::bookmark::{BookmarkDto, CreateBookmarkRequest, ListBookmarksRequest};
+use crate::repository::bookmark::BookmarkFilter;
 use crate::error::AppError;
 use crate::service::bookmark::{BookmarkService, CreateBookmarkParams};
 use crate::sqlite::bookmark::SqliteBookmarkRepository;
@@ -23,6 +24,24 @@ pub async fn add_bookmark(
     browser_bookmark_id: req.browser_bookmark_id,
   };
   svc(&state).create(params).await.map(BookmarkDto::from)
+}
+
+#[tauri::command]
+pub async fn get_bookmarks(
+  state: State<'_, AppState>,
+  req: ListBookmarksRequest,
+) -> Result<Vec<BookmarkDto>, AppError> {
+  let filter = BookmarkFilter {
+    status: req.status,
+    category: req.category,
+    include_deleted: req.include_deleted.unwrap_or(false),
+    limit: req.limit,
+    offset: req.offset,
+  };
+  svc(&state)
+    .list(filter)
+    .await
+    .map(|v| v.into_iter().map(BookmarkDto::from).collect())
 }
 
 #[tauri::command]

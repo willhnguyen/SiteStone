@@ -50,6 +50,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       commands::bookmarks::add_bookmark,
       commands::bookmarks::get_bookmark,
+      commands::bookmarks::get_bookmarks,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
