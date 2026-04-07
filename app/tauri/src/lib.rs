@@ -1,4 +1,6 @@
+mod commands;
 mod domain;
+mod dto;
 mod error;
 mod repository;
 mod service;
@@ -23,11 +25,6 @@ impl AppState {
   }
 }
 
-#[tauri::command]
-async fn greet(name: &str) -> Result<String, String> {
-  Ok(format!("Hello, {}!", name))
-}
-
 pub fn run() {
   tauri::Builder::default()
     .setup(|app| {
@@ -50,7 +47,7 @@ pub fn run() {
       app.manage(state);
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![greet])
+    .invoke_handler(tauri::generate_handler![commands::bookmarks::add_bookmark,])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
