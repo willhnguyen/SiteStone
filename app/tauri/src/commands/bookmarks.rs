@@ -24,3 +24,11 @@ pub async fn add_bookmark(
   };
   svc(&state).create(params).await.map(BookmarkDto::from)
 }
+
+#[tauri::command]
+pub async fn get_bookmark(
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<BookmarkDto, AppError> {
+  svc(&state).get(&id).await.map(BookmarkDto::from)
+}

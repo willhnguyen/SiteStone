@@ -22,6 +22,10 @@ impl<R: BookmarkRepository> BookmarkService<R> {
     Self { repo }
   }
 
+  pub async fn get(&self, id: &str) -> Result<Bookmark, AppError> {
+    self.repo.get_by_id(id).await?.ok_or(AppError::NotFound)
+  }
+
   pub async fn create(&self, params: CreateBookmarkParams) -> Result<Bookmark, AppError> {
     let url_normalized = normalize_url(&params.url)?;
     let now = now();
@@ -96,6 +100,10 @@ mod tests {
       store.push(b.clone());
       Ok(())
     }
+
+    async fn get_by_id(&self, id: &str) -> Result<Option<Bookmark>, AppError> {
+      Ok(self.store.lock().unwrap().iter().find(|b| b.id == id).cloned())
+    }
   }
 
   fn svc() -> BookmarkService<FakeBookmarkRepo> {
@@ -111,6 +119,20 @@ mod tests {
       notes: String::new(),
       browser_bookmark_id: None,
     }
+  }
+
+  #[tokio::test]
+  async fn get_returns_bookmark() {
+    let svc = svc();
+    let b = svc.create(create_params("https://example.com")).await.unwrap();
+    let found = svc.get(&b.id).await.unwrap();
+    assert_eq!(found.id, b.id);
+  }
+
+  #[tokio::test]
+  async fn get_missing_returns_not_found() {
+    let err = svc().get("no-such-id").await.unwrap_err();
+    assert!(matches!(err, AppError::NotFound));
   }
 
   #[tokio::test]

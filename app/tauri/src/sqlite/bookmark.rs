@@ -60,6 +60,19 @@ impl SqliteBookmarkRepository {
 }
 
 impl BookmarkRepository for SqliteBookmarkRepository {
+  async fn get_by_id(&self, id: &str) -> Result<Option<Bookmark>, AppError> {
+    let row = sqlx::query_as::<_, BookmarkRow>(
+      "SELECT id, url, url_normalized, title, description, tags, notes,
+              status, category, character_count, browser_bookmark_id,
+              deleted_at, created_at, updated_at
+       FROM bookmarks WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&self.pool)
+    .await?;
+    row.map(Bookmark::try_from).transpose()
+  }
+
   async fn create(&self, b: &Bookmark) -> Result<(), AppError> {
     let tags = serde_json::to_string(&b.tags)?;
     let result = sqlx::query(
@@ -139,6 +152,21 @@ mod tests {
       .await
       .unwrap();
     assert_eq!(count, 1);
+  }
+
+  #[tokio::test]
+  async fn get_by_id_returns_bookmark() {
+    let repo = setup().await;
+    repo.create(&sample_bookmark("id-1")).await.unwrap();
+    let found = repo.get_by_id("id-1").await.unwrap().unwrap();
+    assert_eq!(found.id, "id-1");
+    assert_eq!(found.tags, vec!["rust"]);
+  }
+
+  #[tokio::test]
+  async fn get_by_id_missing_returns_none() {
+    let repo = setup().await;
+    assert!(repo.get_by_id("no-such-id").await.unwrap().is_none());
   }
 
   #[tokio::test]

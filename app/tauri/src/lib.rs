@@ -47,7 +47,10 @@ pub fn run() {
       app.manage(state);
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![commands::bookmarks::add_bookmark,])
+    .invoke_handler(tauri::generate_handler![
+      commands::bookmarks::add_bookmark,
+      commands::bookmarks::get_bookmark,
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
