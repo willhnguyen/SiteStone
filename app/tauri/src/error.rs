@@ -10,6 +10,15 @@ pub enum AppError {
 
   #[error("serialization error: {0}")]
   Serialization(#[from] serde_json::Error),
+
+  #[error("not found")]
+  NotFound,
+
+  #[error("duplicate: {0}")]
+  Duplicate(String),
+
+  #[error("invalid input: {0}")]
+  InvalidInput(String),
 }
 
 impl serde::ser::Serialize for AppError {
